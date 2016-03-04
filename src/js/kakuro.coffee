@@ -35,6 +35,23 @@ powersum = () ->
 ways = (total, length) ->
   powersum()[total].filter((x) -> x.length == length)
 
+toBitmask = (arr) ->
+  mask = 0
+  for i in arr
+    mask |= (1 << i-1)
+  mask
+
+toArray = (bitmask) ->
+  arr = []
+  for j in [1..9]
+    if ((bitmask & (1 << j-1)) > 0)
+      arr.push(j)
+  arr
+
+intersect = (arr1, arr2) ->
+  toArray(toBitmask(arr1) & toBitmask(arr2))
+
+
 class Kakuro
   constructor: (text) ->
     @cells = []
