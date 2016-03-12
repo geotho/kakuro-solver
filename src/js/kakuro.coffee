@@ -1,6 +1,7 @@
 $ ->
 
-  loadKakuro('kakuros/2016-01-08.txt')
+#   loadKakuro('kakuros/2016-01-08.txt')
+  loadKakuro('kakuros/test.txt')
 
   # kakuroRactive = new Ractive
   #   el: '#kakuro-container'
@@ -13,6 +14,7 @@ loadKakuro = (url) ->
   $.get(url, (data) ->
     k = new Kakuro(data)
     # k.clear()
+    # k.map((cell) -> console.log "x", cell.x, "y", cell.y, "domain", k.domain(cell.x, cell.y) if cell.type() == "NUMBER")
     $('#kakuro-container').html(k.toHtml())
   )
 
@@ -48,26 +50,64 @@ toArray = (bitmask) ->
       arr.push(j)
   arr
 
-intersect = (arr1, arr2) ->
-  toArray(toBitmask(arr1) & toBitmask(arr2))
+intersect = (arr1, arr2) -> toArray(toBitmask(arr1) & toBitmask(arr2))
 
+neq = (one, two) -> one != two
+
+arrayExcept = (arr, idx) ->
+  res = arr[..]
+  res.splice idx, 1
+  res
+
+permute = (arr) ->
+  return [[]] if arr.length == 0
+
+  permutations = (for value,idx in arr
+    [value].concat perm for perm in permute arrayExcept arr, idx)
+
+  # Flatten the array before returning it.
+  [].concat permutations...
+
+vals = (numOne, numTwo) -> (x, y) -> x != numOne || y == numTwo
 
 class Kakuro
   constructor: (text) ->
-    @cells = []
+    cells = []
     for line, y in text.split('\n')
       row = []
       for cell, x in line.split(',')
-        row.push(new Cell(cell, x, y))
-      @cells.push(row)
-    @cells.pop()
+        c = new Cell(cell, x, y)
+        row.push(c)
+      cells.push(row)
+    cells.pop()
+    
+    @cells = cells
+    
+    console.log(@cells)
+    for line, y in cells
+      for cell, x in line
+        if cell.type() == 'NUMBER'
+          cell.domain = @domain(x,y)
+          cells[y][x] = cell
+    @cells = cells
     window.k = @
 
-  width: ->
-    @cells.length
+  width: -> @cells[0].length
 
-  height: ->
-    @cells[0].length
+  height: -> @cells.length
+
+  getCell: (x, y) ->
+    console.assert(x >= 0)
+    console.assert(y >= 0)
+    console.assert(x < @width())
+    console.assert(y < @height())
+
+    return @cells[y][x]
+
+  map: (f) ->
+    for row, y in @cells
+      for cell, x in row
+        f(cell)
 
   clear: ->
     for row, y in @cells
@@ -77,8 +117,14 @@ class Kakuro
 
   toHtml: ->
     html = '<table class="col-sm-12">'
-    for row in @cells
+    html += '<tr>'
+    html += '<td></td>'
+    for i in [0...@width()]
+      html += "<td>#{i}</td>"
+    html += '</tr>'
+    for row, j in @cells
       html += '<tr>'
+      html += "<td>#{j}</td>"
       for cell in row
         html += cell.render()
       html += '</tr>'
@@ -94,8 +140,8 @@ class Kakuro
     c = @cells[y][len]
 
     while c.type() == 'NUMBER'
-      break unless c
       c = @cells[y][++len]
+      break unless c
 
 
     return len - x - 1
@@ -123,18 +169,171 @@ class Kakuro
     return c
 
   colTotal: (x, y) ->
-    c = @cells[y][x]
-    c = @cells[y--][x] while c.type() != 'TOTAL'
+    c = @getCell(x, y)
+    c = @getCell(x, y--) until c.isTotal()
     return c
 
   domain: (x, y) ->
+    rowPoss = ways(@rowTotal(x, y).topRight(), @rowLength(x, y)).reduce(((p, q) -> p.concat(q)), [])
+    colPoss = ways(@colTotal(x, y).bottomLeft(), @colLength(x, y)).reduce(((p, q) -> p.concat(q)), [])
+
+    intersect(rowPoss, colPoss)
+  
+  makeCSP: ->
+    variables = {}
+    constraints = []
+    for row in @cells
+      for cell in row
+        if cell.isTotal()
+          c = @makeConstraints(cell.x, cell.y)
+          
+          # c["constraints"] might be too big to splat.
+          # constraints.concat(c["constraints"]...)
+          constraints.push(x) for x in c["constraints"]
+          if cell.isColTotal()
+            variables[cell.string()+"c"] = c["colDomain"]
+          if cell.isRowTotal()
+            variables[cell.string()+"r"] = c["rowDomain"]
+        if cell.isNumber()
+          variables[cell.string()] = cell.domain
+          
+    csp = {}
+    csp["variables"] = variables
+    csp["constraints"] = constraints
+    csp["cb"] = (assigned, unassigned, csp) ->
+      console.log("assigned=", assigned, "unassigned=", unassigned)
+    csp["timeStep"] = 1
+    
+    return csp
+          
+  
+  makeConstraints: (x, y) ->
+    c = @getCell(x, y)
+    console.assert(c.isTotal())
+    constraints = []
+
+    if c.isRowTotal()
+      
+      rowAdd = @makeRowAddConstraints(x, y)
+      rowDomain = rowAdd["domain"]
+      rowConstraints = rowAdd["constraints"]
+      constraints = constraints
+          .concat(@makeRowNeqConstraints(x, y))
+          .concat(rowConstraints)
+
+    if c.isColTotal()
+      colAdd = @makeColAddConstraints(x, y)
+      colDomain = colAdd["domain"]
+      colConstraints = colAdd["constraints"]
+      constraints = constraints
+          .concat(@makeColNeqConstraints(x, y))
+          .concat(colConstraints)
+    
+    console.log("Created #{constraints.length} constraints for #{c.string()}")
+    return (
+      "constraints": constraints
+      "rowDomain": rowDomain
+      "colDomain": colDomain
+    )
+
+  makeRowNeqConstraints: (x, y) ->
+    totalCell = @rowTotal(x,y)
+    x = totalCell.x
+    y = totalCell.y
+
+    constraints = []
+    len = @rowLength(x, y)
+    for i in [x+1...x+len]
+      for j in [i+1..x+len]
+        constraints.push([@cells[y][i].string(), @cells[y][j].string(), neq])
+    return constraints
+
+  makeColNeqConstraints: (x, y) ->
+    totalCell = @colTotal(x,y)
+    x = totalCell.x
+    y = totalCell.y
+
+    constraints = []
+    len = @colLength(x, y)
+    for i in [y+1...y+len]
+      for j in [i+1..y+len]
+        constraints.push([@cells[i][x].string(), @cells[j][x].string(), neq])
+    return constraints
+
+  makeRowAddConstraints: (x, y) ->
+    totalCell = @rowTotal(x,y)
+    x = totalCell.x
+    y = totalCell.y
+
+    len = @rowLength(x, y)
+    waysArr = ways(totalCell.topRight(), len)
+    allConstraints = []
+    domain = []
+
+    for way, k in waysArr
+      permutations = permute(way)
+      l = permutations.length
+      for perm, j in permutations
+        constraints = []
+        valid = true
+        for v, i in perm
+          c = @getCell(x+i+1, y)
+          if c.domain.indexOf(v) == -1
+            valid = false
+            break
+          # console.log("Adding constraints: #{totalCell.string()} != #{k*l+j} || #{c.string()} == #{v}")
+          constraints.push([totalCell.string()+"r", c.string(), vals(k*l+j, v)])
+          
+        if valid
+          domain.push(k*l+j)
+          allConstraints.push(constraints...)
+
+    # console.log("Produced #{allConstraints.length} row constraints for #{totalCell.string()}")
+    return (
+      "domain": domain
+      "constraints": allConstraints
+    )
+
+  makeColAddConstraints: (x, y) ->
+    totalCell = @colTotal(x,y)
+    x = totalCell.x
+    y = totalCell.y
+
+    len = @colLength(x, y)
+    waysArr = ways(totalCell.bottomLeft(), len)
+    allConstraints = []
+    domain = []
+
+    for way, k in waysArr
+      permutations = permute(way)
+      l = permutations.length
+      for perm, j in permutations
+        constraints = []
+        valid = true
+        for v, i in perm
+          c = @getCell(x, y+i+1)
+          if c.domain.indexOf(v) == -1
+            valid = false
+            break
+          # console.log("Adding constraints: #{totalCell.string()} != #{k*l+j} || #{c.string()} == #{v}")
+          constraints.push([totalCell.string()+"c", c.string(), vals(k*l+j, v)])
+        if valid
+          domain.push(k*l+j)
+          allConstraints.push(constraints...)
+    
+    # console.log("Produced #{allConstraints.length} col constraints for #{totalCell.string()}")
+    return (
+      "domain": domain
+      "constraints": allConstraints
+    )
 
 
 class Cell
-  constructor: (text, x, y) ->
+  constructor: (text, x, y, domain) ->
     @raw = text
     @x = x
     @y = y
+    @domain = domain
 
   type: ->
     if @raw == 'x'
@@ -171,3 +370,18 @@ class Cell
 
   number: ->
     @raw
+
+  string: ->
+    "(#{@x},#{@y})"
+    
+  isTotal: ->
+    @type() == 'TOTAL'
+  
+  isNumber: ->
+    @type() == 'NUMBER'
+    
+  isColTotal: ->
+    @isTotal() && @bottomLeft() != 0
+    
+  isRowTotal: ->
+    @isTotal() && @topRight() != 0
