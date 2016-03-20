@@ -1,7 +1,7 @@
 $ ->
 
-#   loadKakuro('kakuros/2016-01-08.txt')
-  loadKakuro('kakuros/test.txt')
+  loadKakuro('kakuros/2016-01-08.txt')
+#   loadKakuro('kakuros/test.txt')
 
   # kakuroRactive = new Ractive
   #   el: '#kakuro-container'
@@ -13,7 +13,11 @@ $ ->
 loadKakuro = (url) ->
   $.get(url, (data) ->
     k = new Kakuro(data)
-    # k.clear()
+    window.k = k
+    window.b = k.makeCSP()
+    console.log window.b
+    # csp.solve(window.b)
+    k.clear()
     # k.map((cell) -> console.log "x", cell.x, "y", cell.y, "domain", k.domain(cell.x, cell.y) if cell.type() == "NUMBER")
     $('#kakuro-container').html(k.toHtml())
   )
@@ -36,6 +40,23 @@ powersum = () ->
 
 ways = (total, length) ->
   powersum()[total].filter((x) -> x.length == length)
+
+waysIncludes = (total, length, includes...) ->
+  ws = ways(total, length)
+  filteredWays = []
+  inner = (way, includes) ->
+    for i in includes
+      if !way.includes(i)
+        return false
+    return true
+  #predicate true iff all items in includes are in way
+  # ways.filter (way) -> includes.reduce((prev, curr) -> prev && way.includes(curr), )
+  for way in ws
+    if inner(way, includes)
+      filteredWays.push(way)
+
+  filteredWays
+
 
 toBitmask = (arr) ->
   mask = 0
@@ -80,9 +101,7 @@ class Kakuro
         row.push(c)
       cells.push(row)
     cells.pop()
-    
     @cells = cells
-    
     console.log(@cells)
     for line, y in cells
       for cell, x in line
@@ -178,7 +197,7 @@ class Kakuro
     colPoss = ways(@colTotal(x, y).bottomLeft(), @colLength(x, y)).reduce(((p, q) -> p.concat(q)), [])
 
     intersect(rowPoss, colPoss)
-  
+
   makeCSP: ->
     variables = {}
     constraints = []
@@ -186,7 +205,7 @@ class Kakuro
       for cell in row
         if cell.isTotal()
           c = @makeConstraints(cell.x, cell.y)
-          
+
           # c["constraints"] might be too big to splat.
           # constraints.concat(c["constraints"]...)
           constraints.push(x) for x in c["constraints"]
@@ -196,24 +215,24 @@ class Kakuro
             variables[cell.string()+"r"] = c["rowDomain"]
         if cell.isNumber()
           variables[cell.string()] = cell.domain
-          
+
     csp = {}
     csp["variables"] = variables
     csp["constraints"] = constraints
     csp["cb"] = (assigned, unassigned, csp) ->
       console.log("assigned=", assigned, "unassigned=", unassigned)
     csp["timeStep"] = 1
-    
+
     return csp
-          
-  
+
+
   makeConstraints: (x, y) ->
     c = @getCell(x, y)
     console.assert(c.isTotal())
     constraints = []
 
     if c.isRowTotal()
-      
+
       rowAdd = @makeRowAddConstraints(x, y)
       rowDomain = rowAdd["domain"]
       rowConstraints = rowAdd["constraints"]
@@ -228,7 +247,7 @@ class Kakuro
       constraints = constraints
           .concat(@makeColNeqConstraints(x, y))
           .concat(colConstraints)
-    
+
     console.log("Created #{constraints.length} constraints for #{c.string()}")
     return (
       "constraints": constraints
@@ -267,6 +286,14 @@ class Kakuro
 
     len = @rowLength(x, y)
     waysArr = ways(totalCell.topRight(), len)
+
+    if waysArr.length == 1
+        # all rows and columns of length 9 sum to 45, so the not equal constraints are sufficient
+        return (
+            "domain": [0]
+            "constraints": []
+        )
+
     allConstraints = []
     domain = []
 
@@ -283,7 +310,7 @@ class Kakuro
             break
           # console.log("Adding constraints: #{totalCell.string()} != #{k*l+j} || #{c.string()} == #{v}")
           constraints.push([totalCell.string()+"r", c.string(), vals(k*l+j, v)])
-          
+
         if valid
           domain.push(k*l+j)
           allConstraints.push(constraints...)
@@ -301,6 +328,14 @@ class Kakuro
 
     len = @colLength(x, y)
     waysArr = ways(totalCell.bottomLeft(), len)
+
+    if waysArr.length == 1
+        # all rows and columns of length 9 sum to 45, so the not equal constraints are sufficient
+        return (
+            "domain": [0]
+            "constraints": []
+        )
+
     allConstraints = []
     domain = []
 
@@ -320,13 +355,89 @@ class Kakuro
         if valid
           domain.push(k*l+j)
           allConstraints.push(constraints...)
-    
+
     # console.log("Produced #{allConstraints.length} col constraints for #{totalCell.string()}")
     return (
       "domain": domain
       "constraints": allConstraints
     )
 
+  # solveItr inserts one number into the kakuro by:
+  #   1) first looking for any domain of size one.
+  #   2) finding connecting nodes which must be a particular value.
+  #   3) backtracking search to find contradictions to eliminate elements from domains.
+  solveItr: () ->
+    if @solveSingleDomain()
+      @renderOnPage()
+      return true
+
+
+  # solveSingleDomain finds a cell with domain of size one and inserts that value.
+  # Returns true iff a cell with single domain is found.
+  solveSingleDomain: () ->
+    for row in @cells
+      for cell in row
+        if cell.isNumber()
+          if cell.domain.length == 1 && cell.raw == ""
+            @insert(cell.x, cell.y, cell.domain[0])
+            return true
+    return false
+
+  insert: (x, y, val) ->
+    cell = @getCell(x, y)
+    console.assert(cell.domain.includes(val), "inserting into #{cell.string()} value #{val} but not in domain")
+
+    cell.raw = "" + val
+
+    #new domain is the inserection of the waysIncludes and the current domain
+    row = @getRow(x, y)
+    rowTotal = row[0].topRight()
+    rowWays = waysIncludes(rowTotal, row.length-1, @rowInserted(x,y)...).reduce( (a, b) -> (a.concat(b)))
+
+    col = @getCol(x, y)
+    colTotal = col[0].bottomLeft()
+    colWays = waysIncludes(colTotal, col.length-1, @colInserted(x,y)...).reduce( (a, b) -> (a.concat(b)))
+
+    for cell in row[1..]
+      if !((cell.x == x) && (cell.y == y))
+        idx = cell.domain.indexOf(val)
+        isIn = idx >= 0
+        if isIn
+          cell.domain.splice(cell.domain.indexOf(val), 1)
+        cell.domain = intersect(cell.domain, rowWays)
+    for cell in col[1..]
+      if !((cell.x == x) && (cell.y == y))
+        idx = cell.domain.indexOf(val)
+        isIn = idx >= 0
+        if isIn
+          cell.domain.splice(cell.domain.indexOf(val), 1)
+        cell.domain = intersect(cell.domain, colWays)
+
+  getRow: (x, y) ->
+    rowTotal = @rowTotal(x, y)
+    x = rowTotal.x
+    y = rowTotal.y
+    rowLength = @rowLength(x, y)
+    row = [rowTotal]
+    for i in [1..rowLength]
+      row.push(@getCell(x+i, y))
+    row
+
+  getCol: (x, y) ->
+    colTotal = @colTotal(x, y)
+    x = colTotal.x
+    y = colTotal.y
+    colLength = @colLength(x, y)
+    col = [colTotal]
+    for i in [1..colLength]
+      col.push(@getCell(x, y+i))
+    col
+
+  rowInserted: (x, y) -> (cell.number() for cell in @getRow(x, y)[1..] when cell.raw != "")
+  colInserted: (x, y) -> (cell.number() for cell in @getCol(x, y)[1..] when cell.raw != "")
+
+  renderOnPage: () ->
+    $('#kakuro-container').html(a.toHtml())
 
 class Cell
   constructor: (text, x, y, domain) ->
@@ -352,7 +463,7 @@ class Cell
           '<tr>' + '<td>' + @bottomLeftStr() + '</td>' + '</tr>' +
         '</table>' +
       '</td>'
-    return '<td class="number">' + @number() + '</td>'
+    return '<td class="number">' + @raw + '</td>'
 
   topRight: ->
     s = parseInt @raw.split('-')[1]
@@ -369,19 +480,19 @@ class Cell
     if @bottomLeft() == 0 then "" else @bottomLeft() + "&darr;"
 
   number: ->
-    @raw
+    parseInt(@raw)
 
   string: ->
     "(#{@x},#{@y})"
-    
+
   isTotal: ->
     @type() == 'TOTAL'
-  
+
   isNumber: ->
     @type() == 'NUMBER'
-    
+
   isColTotal: ->
     @isTotal() && @bottomLeft() != 0
-    
+
   isRowTotal: ->
     @isTotal() && @topRight() != 0
