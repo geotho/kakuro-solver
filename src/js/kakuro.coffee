@@ -369,7 +369,7 @@ class Kakuro
   #   1) first looking for any domain of size one.
   #   2) finding connecting nodes which must be a particular value.
   #   3) backtracking search to find contradictions to eliminate elements from domains.
-  solveItr: () ->
+  solveItr: ->
     if @solveSingleDomain()
       @renderOnPage()
       return true
@@ -377,7 +377,7 @@ class Kakuro
 
   # solveSingleDomain finds a cell with domain of size one and inserts that value.
   # Returns true iff a cell with single domain is found.
-  solveSingleDomain: () ->
+  solveSingleDomain: ->
     for row in @cells
       for cell in row
         if cell.isNumber()
@@ -439,7 +439,7 @@ class Kakuro
   rowInserted: (x, y) -> (cell.number() for cell in @getRow(x, y)[1..] when cell.raw != "")
   colInserted: (x, y) -> (cell.number() for cell in @getCol(x, y)[1..] when cell.raw != "")
 
-  renderOnPage: () -> $('#kakuro-container').html(a.toHtml())
+  renderOnPage: -> $('#kakuro-container').html(a.toHtml())
 
 class Cell
   constructor: (text, x, y, domain) ->
