@@ -103,12 +103,15 @@ class Kakuro
     cells.pop()
     @cells = cells
     console.log(@cells)
-    for line, y in cells
+    for line, y in @cells
       for cell, x in line
-        if cell.type() == 'NUMBER'
+        if cell.isTotal()
+          cell.rowTotal = cell
+          cell.colTotal = cell
+        else if cell.isNumber()
+          cell.rowTotal = @getCell(x-1, y).rowTotal
+          cell.colTotal = @getCell(x, y-1).colTotal
           cell.domain = @domain(x,y)
-          cells[y][x] = cell
-    @cells = cells
     window.k = @
 
   width: -> @cells[0].length
@@ -182,15 +185,9 @@ class Kakuro
     return len - y - 1
 
   # rowTotal searches left from column x, row y returning the first total cell found.
-  rowTotal: (x, y) ->
-    c = @cells[y][x]
-    c = @cells[y][x--] while c.type() != 'TOTAL'
-    return c
+  rowTotal: (x, y) -> @getCell(x, y).rowTotal
 
-  colTotal: (x, y) ->
-    c = @getCell(x, y)
-    c = @getCell(x, y--) until c.isTotal()
-    return c
+  colTotal: (x, y) -> @getCell(x, y).colTotal
 
   domain: (x, y) ->
     rowPoss = ways(@rowTotal(x, y).topRight(), @rowLength(x, y)).reduce(((p, q) -> p.concat(q)), [])
