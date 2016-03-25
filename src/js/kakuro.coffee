@@ -153,8 +153,10 @@ class Kakuro
     html += '</table>'
 
   # column x, row y. Top left is (0, 0)
-  rowLength: (x, y) ->
-    totalCell = @rowTotal(x,y)
+  rowLength: (origX, origY) ->
+    return @getCell(origX, origY).rowLength if @getCell(origX, origY).rowLength?
+
+    totalCell = @rowTotal(origX, origY)
     x = totalCell.x
     y = totalCell.y
 
@@ -165,12 +167,14 @@ class Kakuro
       c = @cells[y][++len]
       break unless c
 
-
+    @getCell(x, y).rowLength = len - x - 1
     return len - x - 1
 
   # column x, row y. Top left is (0, 0)
-  colLength: (x, y) ->
-    totalCell = @colTotal(x,y)
+  colLength: (origX, origY) ->
+    return @getCell(origX, origY).colLength if @getCell(origX, origY).colLength?
+
+    totalCell = @colTotal(origX,origY)
     x = totalCell.x
     y = totalCell.y
 
@@ -182,6 +186,7 @@ class Kakuro
       break unless r
       c = r[x]
 
+    @getCell(x, y).colLength = len - y - 1
     return len - y - 1
 
   # rowTotal searches left from column x, row y returning the first total cell found.

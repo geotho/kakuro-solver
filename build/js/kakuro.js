@@ -266,9 +266,12 @@
       return html += '</table>';
     };
 
-    Kakuro.prototype.rowLength = function(x, y) {
-      var c, len, totalCell;
-      totalCell = this.rowTotal(x, y);
+    Kakuro.prototype.rowLength = function(origX, origY) {
+      var c, len, totalCell, x, y;
+      if (this.getCell(origX, origY).rowLength != null) {
+        return this.getCell(origX, origY).rowLength;
+      }
+      totalCell = this.rowTotal(origX, origY);
       x = totalCell.x;
       y = totalCell.y;
       len = totalCell.x + 1;
@@ -279,12 +282,16 @@
           break;
         }
       }
+      this.getCell(x, y).rowLength = len - x - 1;
       return len - x - 1;
     };
 
-    Kakuro.prototype.colLength = function(x, y) {
-      var c, len, r, totalCell;
-      totalCell = this.colTotal(x, y);
+    Kakuro.prototype.colLength = function(origX, origY) {
+      var c, len, r, totalCell, x, y;
+      if (this.getCell(origX, origY).colLength != null) {
+        return this.getCell(origX, origY).colLength;
+      }
+      totalCell = this.colTotal(origX, origY);
       x = totalCell.x;
       y = totalCell.y;
       len = totalCell.y + 1;
@@ -296,6 +303,7 @@
         }
         c = r[x];
       }
+      this.getCell(x, y).colLength = len - y - 1;
       return len - y - 1;
     };
 
