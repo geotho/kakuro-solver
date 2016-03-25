@@ -275,9 +275,9 @@
       x = totalCell.x;
       y = totalCell.y;
       len = totalCell.x + 1;
-      c = this.cells[y][len];
-      while (c.type() === 'NUMBER') {
-        c = this.cells[y][++len];
+      c = this.getCell(len, y);
+      while (c.isNumber()) {
+        c = this.getCell(++len, y);
         if (!c) {
           break;
         }
@@ -295,8 +295,8 @@
       x = totalCell.x;
       y = totalCell.y;
       len = totalCell.y + 1;
-      c = this.cells[len][x];
-      while (c.type() === 'NUMBER') {
+      c = this.getCell(x, len);
+      while (c.isNumber()) {
         r = this.cells[++len];
         if (!r) {
           break;

@@ -161,10 +161,10 @@ class Kakuro
     y = totalCell.y
 
     len = totalCell.x+1
-    c = @cells[y][len]
+    c = @getCell(len, y)
 
-    while c.type() == 'NUMBER'
-      c = @cells[y][++len]
+    while c.isNumber()
+      c = @getCell(++len, y)
       break unless c
 
     @getCell(x, y).rowLength = len - x - 1
@@ -179,9 +179,9 @@ class Kakuro
     y = totalCell.y
 
     len = totalCell.y+1
-    c = @cells[len][x]
+    c = @getCell(x, len)
 
-    while c.type() == 'NUMBER'
+    while c.isNumber()
       r = @cells[++len]
       break unless r
       c = r[x]
@@ -438,8 +438,7 @@ class Kakuro
   rowInserted: (x, y) -> (cell.number() for cell in @getRow(x, y)[1..] when cell.raw != "")
   colInserted: (x, y) -> (cell.number() for cell in @getCol(x, y)[1..] when cell.raw != "")
 
-  renderOnPage: () ->
-    $('#kakuro-container').html(a.toHtml())
+  renderOnPage: () -> $('#kakuro-container').html(a.toHtml())
 
 class Cell
   constructor: (text, x, y, domain) ->
