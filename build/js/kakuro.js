@@ -179,6 +179,18 @@
             cell.rowTotal = this.getCell(x - 1, y).rowTotal;
             cell.colTotal = this.getCell(x, y - 1).colTotal;
             cell.domain = this.domain(x, y);
+            cell.constrains = (function() {
+              var len5, ref3, results, u;
+              ref3 = this.getRow(x, y).slice(1).concat(this.getCol(x, y).slice(1));
+              results = [];
+              for (u = 0, len5 = ref3.length; u < len5; u++) {
+                x = ref3[u];
+                if (x !== cell) {
+                  results.push(x);
+                }
+              }
+              return results;
+            }).call(this);
           }
         }
       }

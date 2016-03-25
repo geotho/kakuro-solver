@@ -112,6 +112,7 @@ class Kakuro
           cell.rowTotal = @getCell(x-1, y).rowTotal
           cell.colTotal = @getCell(x, y-1).colTotal
           cell.domain = @domain(x,y)
+          cell.constrains = (x for x in @getRow(x, y)[1..].concat(@getCol(x, y)[1..]) when x != cell)
     window.k = @
 
   width: -> @cells[0].length
