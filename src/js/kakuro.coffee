@@ -113,6 +113,7 @@ class Kakuro
           cell.colTotal = @getCell(x, y-1).colTotal
           cell.domain = @domain(x,y)
           cell.constrains = (x for x in @getRow(x, y)[1..].concat(@getCol(x, y)[1..]) when x != cell)
+    @markGraphSolvable()
     window.k = @
 
   width: -> @cells[0].length
@@ -385,7 +386,36 @@ class Kakuro
             @insert(cell.x, cell.y, cell.domain[0])
             return true
     return false
-
+    
+  resetDiscovered: -> @map((x) -> x.discovered = false)
+  
+  dfs: (start) ->
+    total = 0
+    stack = [start]
+    while (stack.length > 0)
+      v = stack.pop()
+      continue if v.discovered
+      total++
+      v.discovered = true
+      stack.push(x) for x in v.constrains
+    @resetDiscovered()
+    return total
+    
+  totalNumbers: ->
+    return @totalNumbersCache if @totalNumbersCache?
+    total = 0
+    @map((x) -> total++ if x.isNumber())
+    @totalNumbersCache = total
+    
+  markGraphSolvable: ->
+    @map (cell) =>
+      if cell.isNumber()
+        constrains = cell.constrains
+        cell.constrains = []
+        cell.graphSolvable = @dfs(constrains[0])
+        cell.constrains = constrains
+        
+      
   insert: (x, y, val) ->
     cell = @getCell(x, y)
     console.assert(cell.domain.includes(val), "inserting into #{cell.string()} value #{val} but not in domain")
@@ -447,6 +477,7 @@ class Cell
     @x = x
     @y = y
     @domain = domain
+    @discovered = false
 
   type: ->
     if @raw == 'x'
