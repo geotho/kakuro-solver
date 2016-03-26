@@ -19,7 +19,7 @@ loadKakuro = (url) ->
     # csp.solve(window.b)
     k.clear()
     # k.map((cell) -> console.log "x", cell.x, "y", cell.y, "domain", k.domain(cell.x, cell.y) if cell.type() == "NUMBER")
-    $('#kakuro-container').html(k.toHtml())
+    k.renderOnPage()
   )
 
 powersum = () ->
@@ -166,7 +166,7 @@ class Kakuro
     c = @getCell(len, y)
 
     while c.isNumber()
-      c = @getCell(++len, y)
+      c = @cells[y][++len]
       break unless c
 
     @getCell(x, y).rowLength = len - x - 1
@@ -469,7 +469,7 @@ class Kakuro
   rowInserted: (x, y) -> (cell.number() for cell in @getRow(x, y)[1..] when cell.raw != "")
   colInserted: (x, y) -> (cell.number() for cell in @getCol(x, y)[1..] when cell.raw != "")
 
-  renderOnPage: -> $('#kakuro-container').html(a.toHtml())
+  renderOnPage: -> $('#kakuro-container').html(@toHtml())
 
 class Cell
   constructor: (text, x, y, domain) ->
