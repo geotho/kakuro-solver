@@ -525,6 +525,10 @@
         this.renderOnPage();
         return true;
       }
+      if (this.solveGraphSolvable()) {
+        this.renderOnPage();
+        return true;
+      }
     };
 
     Kakuro.prototype.solveSingleDomain = function() {
@@ -545,6 +549,51 @@
       return false;
     };
 
+    Kakuro.prototype.solveGraphSolvable = function() {
+      var cell, len1, len2, m, n, ref, row;
+      ref = this.cells;
+      for (m = 0, len1 = ref.length; m < len1; m++) {
+        row = ref[m];
+        for (n = 0, len2 = row.length; n < len2; n++) {
+          cell = row[n];
+          if (cell.isNumber()) {
+            if (cell.raw === "" && cell.graphSolvable !== this.totalNumbers()) {
+              this.insertGraphSolvable(cell);
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+
+    Kakuro.prototype.insertGraphSolvable = function(cell) {
+      var constrains, start, total, totalsFound;
+      constrains = cell.constrains;
+      cell.constrains = [];
+      total = 0;
+      totalsFound = {};
+      start = 2 * cell.graphSolvable < this.totalNumbers ? constrains[0] : constrains[constrains.length - 1];
+      this.dfsMap(start, function(c) {
+        var colTotal, rowTotal;
+        rowTotal = c.rowTotal;
+        colTotal = c.colTotal;
+        if (c !== cell) {
+          if (!totalsFound["r" + rowTotal.string()]) {
+            totalsFound["r" + rowTotal.string()] = true;
+            total += rowTotal.topRight();
+          }
+          if (!totalsFound["c" + colTotal.string()]) {
+            totalsFound["c" + colTotal.string()] = true;
+            return total -= colTotal.bottomLeft();
+          }
+        }
+      });
+      cell.constrains = constrains;
+      this.insert(cell.x, cell.y, Math.abs(total));
+      return true;
+    };
+
     Kakuro.prototype.resetDiscovered = function() {
       return this.map(function(x) {
         return x.discovered = false;
@@ -552,24 +601,31 @@
     };
 
     Kakuro.prototype.dfs = function(start) {
-      var len1, m, ref, stack, total, v, x;
+      var total;
       total = 0;
+      this.dfsMap(start, function() {
+        return total++;
+      });
+      return total;
+    };
+
+    Kakuro.prototype.dfsMap = function(start, f) {
+      var len1, m, ref, stack, v, x;
       stack = [start];
       while (stack.length > 0) {
         v = stack.pop();
         if (v.discovered) {
           continue;
         }
-        total++;
         v.discovered = true;
+        f(v);
         ref = v.constrains;
         for (m = 0, len1 = ref.length; m < len1; m++) {
           x = ref[m];
           stack.push(x);
         }
       }
-      this.resetDiscovered();
-      return total;
+      return this.resetDiscovered();
     };
 
     Kakuro.prototype.totalNumbers = function() {

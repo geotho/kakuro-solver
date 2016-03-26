@@ -374,7 +374,9 @@ class Kakuro
     if @solveSingleDomain()
       @renderOnPage()
       return true
-
+    if @solveGraphSolvable()
+      @renderOnPage()
+      return true
 
   # solveSingleDomain finds a cell with domain of size one and inserts that value.
   # Returns true iff a cell with single domain is found.
@@ -387,19 +389,64 @@ class Kakuro
             return true
     return false
 
+  solveGraphSolvable: ->
+    for row in @cells
+      for cell in row
+        if cell.isNumber()
+          if cell.raw == "" && cell.graphSolvable != @totalNumbers()
+            @insertGraphSolvable(cell)
+            return true
+    return false
+
+  insertGraphSolvable: (cell) ->
+    # pick the smaller subgraph
+    constrains = cell.constrains
+    cell.constrains = []
+    total = 0
+    totalsFound = {}
+    start = if (2 * cell.graphSolvable < @totalNumbers) then constrains[0] else constrains[constrains.length-1]
+
+    @dfsMap start, (c) ->
+      rowTotal = c.rowTotal
+      colTotal = c.colTotal
+      if c != cell
+        if !totalsFound["r"+rowTotal.string()]
+          totalsFound["r"+rowTotal.string()] = true
+          total += rowTotal.topRight()
+
+        if !totalsFound["c"+colTotal.string()]
+          totalsFound["c"+colTotal.string()] = true
+          total -= colTotal.bottomLeft()
+
+    cell.constrains = constrains
+    @insert(cell.x, cell.y, Math.abs(total))
+    return true
+
+
+    # get the start
+    # search the subgraph
+      # for each node, get the row constraint and the column constraint
+      # if the row constraint is new, add it to total
+      # if the col constraint is new, subtract it from total
+    # insert abs value into cell.
+
   resetDiscovered: -> @map((x) -> x.discovered = false)
 
   dfs: (start) ->
     total = 0
+    @dfsMap start, ->
+      total++
+    return total
+
+  dfsMap: (start, f) ->
     stack = [start]
     while (stack.length > 0)
       v = stack.pop()
       continue if v.discovered
-      total++
       v.discovered = true
+      f(v)
       stack.push(x) for x in v.constrains
     @resetDiscovered()
-    return total
 
   totalNumbers: ->
     return @totalNumbersCache if @totalNumbersCache?
