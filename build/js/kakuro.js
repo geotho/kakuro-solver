@@ -15,7 +15,7 @@
       window.b = k.makeCSP();
       console.log(window.b);
       k.clear();
-      return $('#kakuro-container').html(k.toHtml());
+      return k.renderOnPage();
     });
   };
 
@@ -194,6 +194,7 @@
           }
         }
       }
+      this.markGraphSolvable();
       window.k = this;
     }
 
@@ -289,7 +290,7 @@
       len = totalCell.x + 1;
       c = this.getCell(len, y);
       while (c.isNumber()) {
-        c = this.getCell(++len, y);
+        c = this.cells[y][++len];
         if (!c) {
           break;
         }
@@ -544,6 +545,61 @@
       return false;
     };
 
+    Kakuro.prototype.resetDiscovered = function() {
+      return this.map(function(x) {
+        return x.discovered = false;
+      });
+    };
+
+    Kakuro.prototype.dfs = function(start) {
+      var len1, m, ref, stack, total, v, x;
+      total = 0;
+      stack = [start];
+      while (stack.length > 0) {
+        v = stack.pop();
+        if (v.discovered) {
+          continue;
+        }
+        total++;
+        v.discovered = true;
+        ref = v.constrains;
+        for (m = 0, len1 = ref.length; m < len1; m++) {
+          x = ref[m];
+          stack.push(x);
+        }
+      }
+      this.resetDiscovered();
+      return total;
+    };
+
+    Kakuro.prototype.totalNumbers = function() {
+      var total;
+      if (this.totalNumbersCache != null) {
+        return this.totalNumbersCache;
+      }
+      total = 0;
+      this.map(function(x) {
+        if (x.isNumber()) {
+          return total++;
+        }
+      });
+      return this.totalNumbersCache = total;
+    };
+
+    Kakuro.prototype.markGraphSolvable = function() {
+      return this.map((function(_this) {
+        return function(cell) {
+          var constrains;
+          if (cell.isNumber()) {
+            constrains = cell.constrains;
+            cell.constrains = [];
+            cell.graphSolvable = _this.dfs(constrains[0]);
+            return cell.constrains = constrains;
+          }
+        };
+      })(this));
+    };
+
     Kakuro.prototype.insert = function(x, y, val) {
       var cell, col, colTotal, colWays, idx, isIn, len1, len2, m, n, ref, ref1, results, row, rowTotal, rowWays;
       cell = this.getCell(x, y);
@@ -642,7 +698,7 @@
     };
 
     Kakuro.prototype.renderOnPage = function() {
-      return $('#kakuro-container').html(a.toHtml());
+      return $('#kakuro-container').html(this.toHtml());
     };
 
     return Kakuro;
@@ -655,6 +711,7 @@
       this.x = x;
       this.y = y;
       this.domain = domain;
+      this.discovered = false;
     }
 
     Cell.prototype.type = function() {
