@@ -371,12 +371,45 @@ class Kakuro
   #   2) finding connecting nodes which must be a particular value.
   #   3) backtracking search to find contradictions to eliminate elements from domains.
   solveItr: ->
-    if @solveSingleDomain()
-      @renderOnPage()
-      return true
-    if @solveGraphSolvable()
-      @renderOnPage()
-      return true
+    while true
+      if @solveSingleDomain()
+        console.log("Solved using single domain")
+        @renderOnPage()
+        return true
+      if @solveGraphSolvable()
+        console.log("Solved using graph solvable")
+        @renderOnPage()
+        return true
+
+  solveBacktracking: ->
+    searchQueue = []
+    assignmentStack = []
+    for constrainsSize in [2..9]
+      cell = @findBacktrackingStart(constrainsSize)
+      break if cell?
+
+    # find inconsistent assignment
+    while cell.domain.length > 0
+      if cell.raw != ""
+        cell = searchQueue.pop()
+        continue
+
+      assignmentStack.push(@insert(cell.x, cell.y, cell.domain[0]))
+      searchQueue.push(x) for x in cell.constrains.sort (a, b) -> b.constrains.length - a.constrains.length
+      cell = searchQueue.pop()
+
+    while cell.domain.length == 0
+      out = assignmentStack.pop()
+      cell = @getCell(out.x, out.y)
+      @uninsert(out)
+      console.log("removing ", cell.domain.shift(), "from domain of cell ", cell.string())
+
+  findBacktrackingStart: (constrainsSize) ->
+    for row in @cells
+      for cell in row
+        if cell.isNumber() && cell.raw == "" && cell.constrains.length == constrainsSize
+          return cell
+
 
   # solveSingleDomain finds a cell with domain of size one and inserts that value.
   # Returns true iff a cell with single domain is found.
@@ -462,12 +495,29 @@ class Kakuro
         cell.graphSolvable = @dfs(constrains[0])
         cell.constrains = constrains
 
+
+
+  uninsert: (old) ->
+    x = old.x
+    y = old.y
+    cell = @getCell(x, y)
+    cell.raw = ""
+    for c, i in @getRow(x, y)[1..]
+      c.domain = old.rowDomains[i]
+    for c, i in @getCol(x, y)[1..]
+      c.domain = old.colDomains[i]
+
   insert: (x, y, val) ->
+    old =
+      "x": x
+      "y": y
+      "val": val
+      "rowDomains": []
+      "colDomains": []
     cell = @getCell(x, y)
     console.assert(cell.domain.includes(val), "inserting into #{cell.string()} value #{val} but not in domain")
 
     cell.raw = "" + val
-
     #new domain is the inserection of the waysIncludes and the current domain
     row = @getRow(x, y)
     rowTotal = row[0].topRight()
@@ -478,6 +528,7 @@ class Kakuro
     colWays = waysIncludes(colTotal, col.length-1, @colInserted(x,y)...).reduce( (a, b) -> (a.concat(b)))
 
     for cell in row[1..]
+      old.rowDomains.push(cell.domain.slice(0))
       if !((cell.x == x) && (cell.y == y))
         idx = cell.domain.indexOf(val)
         isIn = idx >= 0
@@ -485,12 +536,14 @@ class Kakuro
           cell.domain.splice(cell.domain.indexOf(val), 1)
         cell.domain = intersect(cell.domain, rowWays)
     for cell in col[1..]
+      old.colDomains.push(cell.domain.slice(0))
       if !((cell.x == x) && (cell.y == y))
         idx = cell.domain.indexOf(val)
         isIn = idx >= 0
         if isIn
           cell.domain.splice(cell.domain.indexOf(val), 1)
         cell.domain = intersect(cell.domain, colWays)
+    return old
 
   getRow: (x, y) ->
     rowTotal = @rowTotal(x, y)

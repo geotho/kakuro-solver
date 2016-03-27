@@ -521,13 +521,66 @@
     };
 
     Kakuro.prototype.solveItr = function() {
-      if (this.solveSingleDomain()) {
-        this.renderOnPage();
-        return true;
+      while (true) {
+        if (this.solveSingleDomain()) {
+          console.log("Solved using single domain");
+          this.renderOnPage();
+          return true;
+        }
+        if (this.solveGraphSolvable()) {
+          console.log("Solved using graph solvable");
+          this.renderOnPage();
+          return true;
+        }
       }
-      if (this.solveGraphSolvable()) {
-        this.renderOnPage();
-        return true;
+    };
+
+    Kakuro.prototype.solveBacktracking = function() {
+      var assignmentStack, cell, constrainsSize, len1, m, n, out, ref, results, searchQueue, x;
+      searchQueue = [];
+      assignmentStack = [];
+      for (constrainsSize = m = 2; m <= 9; constrainsSize = ++m) {
+        cell = this.findBacktrackingStart(constrainsSize);
+        if (cell != null) {
+          break;
+        }
+      }
+      while (cell.domain.length > 0) {
+        if (cell.raw !== "") {
+          cell = searchQueue.pop();
+          continue;
+        }
+        assignmentStack.push(this.insert(cell.x, cell.y, cell.domain[0]));
+        ref = cell.constrains.sort(function(a, b) {
+          return b.constrains.length - a.constrains.length;
+        });
+        for (n = 0, len1 = ref.length; n < len1; n++) {
+          x = ref[n];
+          searchQueue.push(x);
+        }
+        cell = searchQueue.pop();
+      }
+      results = [];
+      while (cell.domain.length === 0) {
+        out = assignmentStack.pop();
+        cell = this.getCell(out.x, out.y);
+        this.uninsert(out);
+        results.push(console.log("removing ", cell.domain.shift(), "from domain of cell ", cell.string()));
+      }
+      return results;
+    };
+
+    Kakuro.prototype.findBacktrackingStart = function(constrainsSize) {
+      var cell, len1, len2, m, n, ref, row;
+      ref = this.cells;
+      for (m = 0, len1 = ref.length; m < len1; m++) {
+        row = ref[m];
+        for (n = 0, len2 = row.length; n < len2; n++) {
+          cell = row[n];
+          if (cell.isNumber() && cell.raw === "" && cell.constrains.length === constrainsSize) {
+            return cell;
+          }
+        }
       }
     };
 
@@ -656,8 +709,35 @@
       })(this));
     };
 
+    Kakuro.prototype.uninsert = function(old) {
+      var c, cell, i, len1, len2, m, n, ref, ref1, results, x, y;
+      x = old.x;
+      y = old.y;
+      cell = this.getCell(x, y);
+      cell.raw = "";
+      ref = this.getRow(x, y).slice(1);
+      for (i = m = 0, len1 = ref.length; m < len1; i = ++m) {
+        c = ref[i];
+        c.domain = old.rowDomains[i];
+      }
+      ref1 = this.getCol(x, y).slice(1);
+      results = [];
+      for (i = n = 0, len2 = ref1.length; n < len2; i = ++n) {
+        c = ref1[i];
+        results.push(c.domain = old.colDomains[i]);
+      }
+      return results;
+    };
+
     Kakuro.prototype.insert = function(x, y, val) {
-      var cell, col, colTotal, colWays, idx, isIn, len1, len2, m, n, ref, ref1, results, row, rowTotal, rowWays;
+      var cell, col, colTotal, colWays, idx, isIn, len1, len2, m, n, old, ref, ref1, row, rowTotal, rowWays;
+      old = {
+        "x": x,
+        "y": y,
+        "val": val,
+        "rowDomains": [],
+        "colDomains": []
+      };
       cell = this.getCell(x, y);
       console.assert(cell.domain.includes(val), "inserting into " + (cell.string()) + " value " + val + " but not in domain");
       cell.raw = "" + val;
@@ -674,6 +754,7 @@
       ref = row.slice(1);
       for (m = 0, len1 = ref.length; m < len1; m++) {
         cell = ref[m];
+        old.rowDomains.push(cell.domain.slice(0));
         if (!((cell.x === x) && (cell.y === y))) {
           idx = cell.domain.indexOf(val);
           isIn = idx >= 0;
@@ -684,21 +765,19 @@
         }
       }
       ref1 = col.slice(1);
-      results = [];
       for (n = 0, len2 = ref1.length; n < len2; n++) {
         cell = ref1[n];
+        old.colDomains.push(cell.domain.slice(0));
         if (!((cell.x === x) && (cell.y === y))) {
           idx = cell.domain.indexOf(val);
           isIn = idx >= 0;
           if (isIn) {
             cell.domain.splice(cell.domain.indexOf(val), 1);
           }
-          results.push(cell.domain = intersect(cell.domain, colWays));
-        } else {
-          results.push(void 0);
+          cell.domain = intersect(cell.domain, colWays);
         }
       }
-      return results;
+      return old;
     };
 
     Kakuro.prototype.getRow = function(x, y) {
