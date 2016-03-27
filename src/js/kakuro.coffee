@@ -202,170 +202,6 @@ class Kakuro
 
     intersect(rowPoss, colPoss)
 
-  makeCSP: ->
-    variables = {}
-    constraints = []
-    for row in @cells
-      for cell in row
-        if cell.isTotal()
-          c = @makeConstraints(cell.x, cell.y)
-
-          # c["constraints"] might be too big to splat.
-          # constraints.concat(c["constraints"]...)
-          constraints.push(x) for x in c["constraints"]
-          if cell.isColTotal()
-            variables[cell.string()+"c"] = c["colDomain"]
-          if cell.isRowTotal()
-            variables[cell.string()+"r"] = c["rowDomain"]
-        if cell.isNumber()
-          variables[cell.string()] = cell.domain
-
-    csp = {}
-    csp["variables"] = variables
-    csp["constraints"] = constraints
-    csp["cb"] = (assigned, unassigned, csp) ->
-      console.log("assigned=", assigned, "unassigned=", unassigned)
-    csp["timeStep"] = 1
-
-    return csp
-
-
-  makeConstraints: (x, y) ->
-    c = @getCell(x, y)
-    console.assert(c.isTotal())
-    constraints = []
-
-    if c.isRowTotal()
-
-      rowAdd = @makeRowAddConstraints(x, y)
-      rowDomain = rowAdd["domain"]
-      rowConstraints = rowAdd["constraints"]
-      constraints = constraints
-          .concat(@makeRowNeqConstraints(x, y))
-          .concat(rowConstraints)
-
-    if c.isColTotal()
-      colAdd = @makeColAddConstraints(x, y)
-      colDomain = colAdd["domain"]
-      colConstraints = colAdd["constraints"]
-      constraints = constraints
-          .concat(@makeColNeqConstraints(x, y))
-          .concat(colConstraints)
-
-    console.log("Created #{constraints.length} constraints for #{c.string()}")
-    return (
-      "constraints": constraints
-      "rowDomain": rowDomain
-      "colDomain": colDomain
-    )
-
-  makeRowNeqConstraints: (x, y) ->
-    totalCell = @rowTotal(x,y)
-    x = totalCell.x
-    y = totalCell.y
-
-    constraints = []
-    len = @rowLength(x, y)
-    for i in [x+1...x+len]
-      for j in [i+1..x+len]
-        constraints.push([@cells[y][i].string(), @cells[y][j].string(), neq])
-    return constraints
-
-  makeColNeqConstraints: (x, y) ->
-    totalCell = @colTotal(x,y)
-    x = totalCell.x
-    y = totalCell.y
-
-    constraints = []
-    len = @colLength(x, y)
-    for i in [y+1...y+len]
-      for j in [i+1..y+len]
-        constraints.push([@cells[i][x].string(), @cells[j][x].string(), neq])
-    return constraints
-
-  makeRowAddConstraints: (x, y) ->
-    totalCell = @rowTotal(x,y)
-    x = totalCell.x
-    y = totalCell.y
-
-    len = @rowLength(x, y)
-    waysArr = ways(totalCell.topRight(), len)
-
-    if waysArr.length == 1
-        # all rows and columns of length 9 sum to 45, so the not equal constraints are sufficient
-        return (
-            "domain": [0]
-            "constraints": []
-        )
-
-    allConstraints = []
-    domain = []
-
-    for way, k in waysArr
-      permutations = permute(way)
-      l = permutations.length
-      for perm, j in permutations
-        constraints = []
-        valid = true
-        for v, i in perm
-          c = @getCell(x+i+1, y)
-          if c.domain.indexOf(v) == -1
-            valid = false
-            break
-          # console.log("Adding constraints: #{totalCell.string()} != #{k*l+j} || #{c.string()} == #{v}")
-          constraints.push([totalCell.string()+"r", c.string(), vals(k*l+j, v)])
-
-        if valid
-          domain.push(k*l+j)
-          allConstraints.push(constraints...)
-
-    # console.log("Produced #{allConstraints.length} row constraints for #{totalCell.string()}")
-    return (
-      "domain": domain
-      "constraints": allConstraints
-    )
-
-  makeColAddConstraints: (x, y) ->
-    totalCell = @colTotal(x,y)
-    x = totalCell.x
-    y = totalCell.y
-
-    len = @colLength(x, y)
-    waysArr = ways(totalCell.bottomLeft(), len)
-
-    if waysArr.length == 1
-        # all rows and columns of length 9 sum to 45, so the not equal constraints are sufficient
-        return (
-            "domain": [0]
-            "constraints": []
-        )
-
-    allConstraints = []
-    domain = []
-
-    for way, k in waysArr
-      permutations = permute(way)
-      l = permutations.length
-      for perm, j in permutations
-        constraints = []
-        valid = true
-        for v, i in perm
-          c = @getCell(x, y+i+1)
-          if c.domain.indexOf(v) == -1
-            valid = false
-            break
-          # console.log("Adding constraints: #{totalCell.string()} != #{k*l+j} || #{c.string()} == #{v}")
-          constraints.push([totalCell.string()+"c", c.string(), vals(k*l+j, v)])
-        if valid
-          domain.push(k*l+j)
-          allConstraints.push(constraints...)
-
-    # console.log("Produced #{allConstraints.length} col constraints for #{totalCell.string()}")
-    return (
-      "domain": domain
-      "constraints": allConstraints
-    )
-
   # solveItr inserts one number into the kakuro by:
   #   1) first looking for any domain of size one.
   #   2) finding connecting nodes which must be a particular value.
@@ -380,36 +216,20 @@ class Kakuro
         console.log("Solved using graph solvable")
         @renderOnPage()
         return true
+      @findImpossibleAssignment()
 
-  solveBacktracking: ->
-    searchQueue = []
-    assignmentStack = []
-    for constrainsSize in [2..9]
-      cell = @findBacktrackingStart(constrainsSize)
-      break if cell?
-
-    # find inconsistent assignment
-    while cell.domain.length > 0
-      if cell.raw != ""
-        cell = searchQueue.pop()
-        continue
-
-      assignmentStack.push(@insert(cell.x, cell.y, cell.domain[0]))
-      searchQueue.push(x) for x in cell.constrains.sort (a, b) -> b.constrains.length - a.constrains.length
-      cell = searchQueue.pop()
-
-    while cell.domain.length == 0
-      out = assignmentStack.pop()
-      cell = @getCell(out.x, out.y)
-      @uninsert(out)
-      console.log("removing ", cell.domain.shift(), "from domain of cell ", cell.string())
-
-  findBacktrackingStart: (constrainsSize) ->
+  findImpossibleAssignment: (depth) ->
     for row in @cells
-      for cell in row
-        if cell.isNumber() && cell.raw == "" && cell.constrains.length == constrainsSize
-          return cell
-
+      for cell in row when cell.isNumber() && cell.raw == ""
+        for d in cell.domain
+          out = @insert(cell.x, cell.y, d)
+          for poop in cell.constrains
+            if poop.domain.length == 0
+              @uninsert(out)
+              console.log("Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string(), "because", poop.string(), "is empty." )
+              return cell
+          @uninsert(out)
+    return
 
   # solveSingleDomain finds a cell with domain of size one and inserts that value.
   # Returns true iff a cell with single domain is found.
@@ -494,8 +314,6 @@ class Kakuro
         cell.constrains = []
         cell.graphSolvable = @dfs(constrains[0])
         cell.constrains = constrains
-
-
 
   uninsert: (old) ->
     x = old.x
@@ -605,26 +423,18 @@ class Cell
     s = @raw.split('-')[0]
     if !!s then parseInt s else 0
 
-  topRightStr: ->
-    if @topRight() == 0 then "" else @topRight() + "&rarr;"
+  topRightStr: -> if @topRight() == 0 then "" else @topRight() + "&rarr;"
 
-  bottomLeftStr: ->
-    if @bottomLeft() == 0 then "" else @bottomLeft() + "&darr;"
+  bottomLeftStr: -> if @bottomLeft() == 0 then "" else @bottomLeft() + "&darr;"
 
-  number: ->
-    parseInt(@raw)
+  number: -> parseInt(@raw)
 
-  string: ->
-    "(#{@x},#{@y})"
+  string: -> "(#{@x},#{@y})"
 
-  isTotal: ->
-    @type() == 'TOTAL'
+  isTotal: -> @type() == 'TOTAL'
 
-  isNumber: ->
-    @type() == 'NUMBER'
+  isNumber: -> @type() == 'NUMBER'
 
-  isColTotal: ->
-    @isTotal() && @bottomLeft() != 0
+  isColTotal: -> @isTotal() && @bottomLeft() != 0
 
-  isRowTotal: ->
-    @isTotal() && @topRight() != 0
+  isRowTotal: -> @isTotal() && @topRight() != 0

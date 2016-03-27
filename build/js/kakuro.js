@@ -339,187 +339,6 @@
       return intersect(rowPoss, colPoss);
     };
 
-    Kakuro.prototype.makeCSP = function() {
-      var c, cell, constraints, csp, len1, len2, len3, m, n, o, ref, ref1, row, variables, x;
-      variables = {};
-      constraints = [];
-      ref = this.cells;
-      for (m = 0, len1 = ref.length; m < len1; m++) {
-        row = ref[m];
-        for (n = 0, len2 = row.length; n < len2; n++) {
-          cell = row[n];
-          if (cell.isTotal()) {
-            c = this.makeConstraints(cell.x, cell.y);
-            ref1 = c["constraints"];
-            for (o = 0, len3 = ref1.length; o < len3; o++) {
-              x = ref1[o];
-              constraints.push(x);
-            }
-            if (cell.isColTotal()) {
-              variables[cell.string() + "c"] = c["colDomain"];
-            }
-            if (cell.isRowTotal()) {
-              variables[cell.string() + "r"] = c["rowDomain"];
-            }
-          }
-          if (cell.isNumber()) {
-            variables[cell.string()] = cell.domain;
-          }
-        }
-      }
-      csp = {};
-      csp["variables"] = variables;
-      csp["constraints"] = constraints;
-      csp["cb"] = function(assigned, unassigned, csp) {
-        return console.log("assigned=", assigned, "unassigned=", unassigned);
-      };
-      csp["timeStep"] = 1;
-      return csp;
-    };
-
-    Kakuro.prototype.makeConstraints = function(x, y) {
-      var c, colAdd, colConstraints, colDomain, constraints, rowAdd, rowConstraints, rowDomain;
-      c = this.getCell(x, y);
-      console.assert(c.isTotal());
-      constraints = [];
-      if (c.isRowTotal()) {
-        rowAdd = this.makeRowAddConstraints(x, y);
-        rowDomain = rowAdd["domain"];
-        rowConstraints = rowAdd["constraints"];
-        constraints = constraints.concat(this.makeRowNeqConstraints(x, y)).concat(rowConstraints);
-      }
-      if (c.isColTotal()) {
-        colAdd = this.makeColAddConstraints(x, y);
-        colDomain = colAdd["domain"];
-        colConstraints = colAdd["constraints"];
-        constraints = constraints.concat(this.makeColNeqConstraints(x, y)).concat(colConstraints);
-      }
-      console.log("Created " + constraints.length + " constraints for " + (c.string()));
-      return {
-        "constraints": constraints,
-        "rowDomain": rowDomain,
-        "colDomain": colDomain
-      };
-    };
-
-    Kakuro.prototype.makeRowNeqConstraints = function(x, y) {
-      var constraints, i, j, len, m, n, ref, ref1, ref2, ref3, totalCell;
-      totalCell = this.rowTotal(x, y);
-      x = totalCell.x;
-      y = totalCell.y;
-      constraints = [];
-      len = this.rowLength(x, y);
-      for (i = m = ref = x + 1, ref1 = x + len; ref <= ref1 ? m < ref1 : m > ref1; i = ref <= ref1 ? ++m : --m) {
-        for (j = n = ref2 = i + 1, ref3 = x + len; ref2 <= ref3 ? n <= ref3 : n >= ref3; j = ref2 <= ref3 ? ++n : --n) {
-          constraints.push([this.cells[y][i].string(), this.cells[y][j].string(), neq]);
-        }
-      }
-      return constraints;
-    };
-
-    Kakuro.prototype.makeColNeqConstraints = function(x, y) {
-      var constraints, i, j, len, m, n, ref, ref1, ref2, ref3, totalCell;
-      totalCell = this.colTotal(x, y);
-      x = totalCell.x;
-      y = totalCell.y;
-      constraints = [];
-      len = this.colLength(x, y);
-      for (i = m = ref = y + 1, ref1 = y + len; ref <= ref1 ? m < ref1 : m > ref1; i = ref <= ref1 ? ++m : --m) {
-        for (j = n = ref2 = i + 1, ref3 = y + len; ref2 <= ref3 ? n <= ref3 : n >= ref3; j = ref2 <= ref3 ? ++n : --n) {
-          constraints.push([this.cells[i][x].string(), this.cells[j][x].string(), neq]);
-        }
-      }
-      return constraints;
-    };
-
-    Kakuro.prototype.makeRowAddConstraints = function(x, y) {
-      var allConstraints, c, constraints, domain, i, j, k, l, len, len1, len2, len3, m, n, o, perm, permutations, totalCell, v, valid, way, waysArr;
-      totalCell = this.rowTotal(x, y);
-      x = totalCell.x;
-      y = totalCell.y;
-      len = this.rowLength(x, y);
-      waysArr = ways(totalCell.topRight(), len);
-      if (waysArr.length === 1) {
-        return {
-          "domain": [0],
-          "constraints": []
-        };
-      }
-      allConstraints = [];
-      domain = [];
-      for (k = m = 0, len1 = waysArr.length; m < len1; k = ++m) {
-        way = waysArr[k];
-        permutations = permute(way);
-        l = permutations.length;
-        for (j = n = 0, len2 = permutations.length; n < len2; j = ++n) {
-          perm = permutations[j];
-          constraints = [];
-          valid = true;
-          for (i = o = 0, len3 = perm.length; o < len3; i = ++o) {
-            v = perm[i];
-            c = this.getCell(x + i + 1, y);
-            if (c.domain.indexOf(v) === -1) {
-              valid = false;
-              break;
-            }
-            constraints.push([totalCell.string() + "r", c.string(), vals(k * l + j, v)]);
-          }
-          if (valid) {
-            domain.push(k * l + j);
-            allConstraints.push.apply(allConstraints, constraints);
-          }
-        }
-      }
-      return {
-        "domain": domain,
-        "constraints": allConstraints
-      };
-    };
-
-    Kakuro.prototype.makeColAddConstraints = function(x, y) {
-      var allConstraints, c, constraints, domain, i, j, k, l, len, len1, len2, len3, m, n, o, perm, permutations, totalCell, v, valid, way, waysArr;
-      totalCell = this.colTotal(x, y);
-      x = totalCell.x;
-      y = totalCell.y;
-      len = this.colLength(x, y);
-      waysArr = ways(totalCell.bottomLeft(), len);
-      if (waysArr.length === 1) {
-        return {
-          "domain": [0],
-          "constraints": []
-        };
-      }
-      allConstraints = [];
-      domain = [];
-      for (k = m = 0, len1 = waysArr.length; m < len1; k = ++m) {
-        way = waysArr[k];
-        permutations = permute(way);
-        l = permutations.length;
-        for (j = n = 0, len2 = permutations.length; n < len2; j = ++n) {
-          perm = permutations[j];
-          constraints = [];
-          valid = true;
-          for (i = o = 0, len3 = perm.length; o < len3; i = ++o) {
-            v = perm[i];
-            c = this.getCell(x, y + i + 1);
-            if (c.domain.indexOf(v) === -1) {
-              valid = false;
-              break;
-            }
-            constraints.push([totalCell.string() + "c", c.string(), vals(k * l + j, v)]);
-          }
-          if (valid) {
-            domain.push(k * l + j);
-            allConstraints.push.apply(allConstraints, constraints);
-          }
-        }
-      }
-      return {
-        "domain": domain,
-        "constraints": allConstraints
-      };
-    };
-
     Kakuro.prototype.solveItr = function() {
       while (true) {
         if (this.solveSingleDomain()) {
@@ -532,53 +351,33 @@
           this.renderOnPage();
           return true;
         }
+        this.findImpossibleAssignment();
       }
     };
 
-    Kakuro.prototype.solveBacktracking = function() {
-      var assignmentStack, cell, constrainsSize, len1, m, n, out, ref, results, searchQueue, x;
-      searchQueue = [];
-      assignmentStack = [];
-      for (constrainsSize = m = 2; m <= 9; constrainsSize = ++m) {
-        cell = this.findBacktrackingStart(constrainsSize);
-        if (cell != null) {
-          break;
-        }
-      }
-      while (cell.domain.length > 0) {
-        if (cell.raw !== "") {
-          cell = searchQueue.pop();
-          continue;
-        }
-        assignmentStack.push(this.insert(cell.x, cell.y, cell.domain[0]));
-        ref = cell.constrains.sort(function(a, b) {
-          return b.constrains.length - a.constrains.length;
-        });
-        for (n = 0, len1 = ref.length; n < len1; n++) {
-          x = ref[n];
-          searchQueue.push(x);
-        }
-        cell = searchQueue.pop();
-      }
-      results = [];
-      while (cell.domain.length === 0) {
-        out = assignmentStack.pop();
-        cell = this.getCell(out.x, out.y);
-        this.uninsert(out);
-        results.push(console.log("removing ", cell.domain.shift(), "from domain of cell ", cell.string()));
-      }
-      return results;
-    };
-
-    Kakuro.prototype.findBacktrackingStart = function(constrainsSize) {
-      var cell, len1, len2, m, n, ref, row;
+    Kakuro.prototype.findImpossibleAssignment = function(depth) {
+      var cell, d, len1, len2, len3, len4, m, n, o, out, poop, ref, ref1, ref2, row, t;
       ref = this.cells;
       for (m = 0, len1 = ref.length; m < len1; m++) {
         row = ref[m];
         for (n = 0, len2 = row.length; n < len2; n++) {
           cell = row[n];
-          if (cell.isNumber() && cell.raw === "" && cell.constrains.length === constrainsSize) {
-            return cell;
+          if (cell.isNumber() && cell.raw === "") {
+            ref1 = cell.domain;
+            for (o = 0, len3 = ref1.length; o < len3; o++) {
+              d = ref1[o];
+              out = this.insert(cell.x, cell.y, d);
+              ref2 = cell.constrains;
+              for (t = 0, len4 = ref2.length; t < len4; t++) {
+                poop = ref2[t];
+                if (poop.domain.length === 0) {
+                  this.uninsert(out);
+                  console.log("Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string(), "because", poop.string(), "is empty.");
+                  return cell;
+                }
+              }
+              this.uninsert(out);
+            }
           }
         }
       }
