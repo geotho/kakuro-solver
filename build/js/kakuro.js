@@ -4,7 +4,7 @@
     slice = [].slice;
 
   $(function() {
-    return loadKakuro('kakuros/2016-01-08.txt');
+    return loadKakuro('kakuros/2016-02-29.txt');
   });
 
   loadKakuro = function(url) {
@@ -12,7 +12,6 @@
       var k;
       k = new Kakuro(data);
       window.k = k;
-      window.b = k.makeCSP();
       console.log(window.b);
       k.clear();
       return k.renderOnPage();
@@ -351,7 +350,10 @@
           this.renderOnPage();
           return true;
         }
-        this.findImpossibleAssignment();
+        if (!this.solveBacktracking()) {
+          console.log("Could not solve backtracking");
+          return false;
+        }
       }
     };
 
@@ -372,12 +374,91 @@
                 poop = ref2[t];
                 if (poop.domain.length === 0) {
                   this.uninsert(out);
-                  console.log("Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string(), "because", poop.string(), "is empty.");
+                  console.log("[Impossible] Removed", cell.domain.splice(cell.domain.indexOf(out.val), 1), "from", cell.string(), "because", poop.string(), "is empty.");
                   return cell;
                 }
               }
               this.uninsert(out);
             }
+          }
+        }
+      }
+      return null;
+    };
+
+    Kakuro.prototype.backtrack = function(cell, depth, initialDepth) {
+      var allDomainsBad, b, d, dep, i, len1, len2, m, n, o, out, ref, ref1, removeMe, thisDomainBad;
+      if (cell.domain.length === 0 || cell.raw !== "") {
+        return true;
+      }
+      if (depth === 0) {
+        return false;
+      }
+      allDomainsBad = true;
+      removeMe = [];
+      for (i = m = 0, ref = cell.domain.length; 0 <= ref ? m < ref : m > ref; i = 0 <= ref ? ++m : --m) {
+        d = cell.domain[i];
+        thisDomainBad = false;
+        out = this.insert(cell.x, cell.y, d);
+        ref1 = cell.constrains;
+        for (n = 0, len1 = ref1.length; n < len1; n++) {
+          dep = ref1[n];
+          if (!(dep.raw === "")) {
+            continue;
+          }
+          b = this.backtrack(dep, depth - 1, initialDepth);
+          thisDomainBad = thisDomainBad || b;
+          if (thisDomainBad) {
+            break;
+          }
+        }
+        allDomainsBad = allDomainsBad && thisDomainBad;
+        this.uninsert(out);
+        if (thisDomainBad) {
+          removeMe.push(d);
+        }
+      }
+      for (o = 0, len2 = removeMe.length; o < len2; o++) {
+        d = removeMe[o];
+        if (depth === initialDepth) {
+          console.log("[backtrack] Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string());
+        }
+      }
+      if (depth === initialDepth && removeMe.length > 0) {
+        return true;
+      }
+      return allDomainsBad;
+    };
+
+    Kakuro.prototype.solveBacktracking = function() {
+      var cell, i, len1, len2, m, n, o, ref, row;
+      for (i = m = 1; m <= 10; i = ++m) {
+        console.log("backtracking to a depth " + i);
+        ref = this.cells;
+        for (n = 0, len1 = ref.length; n < len1; n++) {
+          row = ref[n];
+          for (o = 0, len2 = row.length; o < len2; o++) {
+            cell = row[o];
+            if (cell.isNumber() && cell.raw === "") {
+              if (this.backtrack(cell, i, i)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+      return false;
+    };
+
+    Kakuro.prototype.findBacktrackingStart = function(constrainsSize) {
+      var cell, len1, len2, m, n, ref, row;
+      ref = this.cells;
+      for (m = 0, len1 = ref.length; m < len1; m++) {
+        row = ref[m];
+        for (n = 0, len2 = row.length; n < len2; n++) {
+          cell = row[n];
+          if (cell.isNumber() && cell.raw === "" && cell.constrains.length === constrainsSize) {
+            return cell;
           }
         }
       }
@@ -513,6 +594,7 @@
       x = old.x;
       y = old.y;
       cell = this.getCell(x, y);
+      cell.domain = old.myDomain.slice(1);
       cell.raw = "";
       ref = this.getRow(x, y).slice(1);
       for (i = m = 0, len1 = ref.length; m < len1; i = ++m) {
@@ -529,7 +611,7 @@
     };
 
     Kakuro.prototype.insert = function(x, y, val) {
-      var cell, col, colTotal, colWays, idx, isIn, len1, len2, m, n, old, ref, ref1, row, rowTotal, rowWays;
+      var cell, col, colTotal, colWays, idx, isIn, len1, len2, m, n, old, poop, ref, ref1, row, rowTotal, rowWays;
       old = {
         "x": x,
         "y": y,
@@ -537,9 +619,10 @@
         "rowDomains": [],
         "colDomains": []
       };
-      cell = this.getCell(x, y);
-      console.assert(cell.domain.includes(val), "inserting into " + (cell.string()) + " value " + val + " but not in domain");
-      cell.raw = "" + val;
+      poop = this.getCell(x, y);
+      console.assert(poop.domain.includes(val), "inserting into " + (poop.string()) + " value " + val + " but not in domain");
+      old.myDomain = poop.domain.slice(0);
+      poop.raw = "" + val;
       row = this.getRow(x, y);
       rowTotal = row[0].topRight();
       rowWays = waysIncludes.apply(null, [rowTotal, row.length - 1].concat(slice.call(this.rowInserted(x, y)))).reduce(function(a, b) {

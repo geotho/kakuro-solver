@@ -1,6 +1,7 @@
 $ ->
 
-  loadKakuro('kakuros/2016-01-08.txt')
+  loadKakuro('kakuros/2016-02-29.txt')
+  # loadKakuro('kakuros/2016-01-08.txt')
 #   loadKakuro('kakuros/test.txt')
 
   # kakuroRactive = new Ractive
@@ -14,11 +15,8 @@ loadKakuro = (url) ->
   $.get(url, (data) ->
     k = new Kakuro(data)
     window.k = k
-    window.b = k.makeCSP()
     console.log window.b
-    # csp.solve(window.b)
     k.clear()
-    # k.map((cell) -> console.log "x", cell.x, "y", cell.y, "domain", k.domain(cell.x, cell.y) if cell.type() == "NUMBER")
     k.renderOnPage()
   )
 
@@ -216,19 +214,100 @@ class Kakuro
         console.log("Solved using graph solvable")
         @renderOnPage()
         return true
-      @findImpossibleAssignment()
+      # if @findImpossibleAssignment()
+        # console.log("Removed impossible assignment")
+        # return true
+        # continue
+      # @solveBacktracking()
+      if !@solveBacktracking()
+        console.log("Could not solve backtracking")
+        return false
+
 
   findImpossibleAssignment: (depth) ->
     for row in @cells
       for cell in row when cell.isNumber() && cell.raw == ""
+        # keep inserting into a new cell UNTIL
         for d in cell.domain
           out = @insert(cell.x, cell.y, d)
           for poop in cell.constrains
             if poop.domain.length == 0
               @uninsert(out)
-              console.log("Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string(), "because", poop.string(), "is empty." )
+              console.log("[Impossible] Removed", cell.domain.splice(cell.domain.indexOf(out.val), 1), "from", cell.string(), "because", poop.string(), "is empty." )
               return cell
           @uninsert(out)
+    return null
+
+  # backtracking: (start) ->
+    # goal is to exclude from domain by contradiction
+    # for
+
+
+  backtrack: (cell, depth, initialDepth) ->
+    if cell.domain.length == 0 || cell.raw != ""
+      return true
+    if depth == 0
+      return false
+
+    allDomainsBad = true
+    removeMe = []
+    for i in [0...cell.domain.length]
+      d = cell.domain[i]
+      thisDomainBad = false
+      out = @insert(cell.x, cell.y, d)
+      for dep in cell.constrains when dep.raw == ""
+        b = @backtrack(dep, depth-1, initialDepth)
+
+        thisDomainBad = thisDomainBad || b
+        if thisDomainBad
+          break
+      allDomainsBad = allDomainsBad && thisDomainBad
+      @uninsert(out)
+      if thisDomainBad
+        removeMe.push(d)
+    for d in removeMe
+      if depth == initialDepth
+        console.log("[backtrack] Removed", cell.domain.splice(cell.domain.indexOf(d), 1), "from", cell.string())
+    if depth == initialDepth && removeMe.length > 0
+      return true
+    return allDomainsBad
+
+  solveBacktracking: ->
+    for i in [1..10]
+      console.log("backtracking to a depth " + i)
+      for row in @cells
+        for cell in row
+          if cell.isNumber() && cell.raw == ""
+            if @backtrack(cell, i, i)
+              return true
+    return false
+  #   searchQueue = []
+  #   assignmentStack = []
+
+  #   # keep assigning until inconsistent, maintaining a log of stuff to assign.
+  #   # if reach contradiction,
+
+  #   # find inconsistent assignment
+  #   while cell.domain.length > 0
+  #     if cell.raw != ""
+  #       cell = searchQueue.pop()
+  #       continue
+
+  #     assignmentStack.push(@insert(cell.x, cell.y, cell.domain[0]))
+  #     searchQueue.push(x) for x in cell.constrains.sort (a, b) -> b.constrains.length - a.constrains.length
+  #     cell = searchQueue.pop()
+
+  #   while cell.domain.length == 0
+  #     out = assignmentStack.pop()
+  #     cell = @getCell(out.x, out.y)
+  #     @uninsert(out)
+  #     console.log("[backtracking] removing ", cell.domain.splice(cell.domain.indexOf(out.val), 1), "from domain of cell ", cell.string())
+
+  findBacktrackingStart: (constrainsSize) ->
+    for row in @cells
+      for cell in row
+        if cell.isNumber() && cell.raw == "" && cell.constrains.length == constrainsSize
+          return cell
     return
 
   # solveSingleDomain finds a cell with domain of size one and inserts that value.
@@ -319,6 +398,7 @@ class Kakuro
     x = old.x
     y = old.y
     cell = @getCell(x, y)
+    cell.domain = old.myDomain.slice(1)
     cell.raw = ""
     for c, i in @getRow(x, y)[1..]
       c.domain = old.rowDomains[i]
@@ -332,10 +412,11 @@ class Kakuro
       "val": val
       "rowDomains": []
       "colDomains": []
-    cell = @getCell(x, y)
-    console.assert(cell.domain.includes(val), "inserting into #{cell.string()} value #{val} but not in domain")
+    poop = @getCell(x, y)
+    console.assert(poop.domain.includes(val), "inserting into #{poop.string()} value #{val} but not in domain")
 
-    cell.raw = "" + val
+    old.myDomain = poop.domain.slice(0)
+    poop.raw = "" + val
     #new domain is the inserection of the waysIncludes and the current domain
     row = @getRow(x, y)
     rowTotal = row[0].topRight()
