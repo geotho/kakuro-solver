@@ -4,8 +4,8 @@ html
     title Kakuro solver
     link(href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css', rel='stylesheet')
     link(href='css/style.css', rel='stylesheet')
-    
-    
+
+
   body
     div.container
       div.row
@@ -18,11 +18,16 @@ html
             li Each row and column must add up to the number directly above or to the left of it;
             li You can only use the numbers one to nine;
             li Each number in the row or column must be distinct.
+          .row
+            .col-sm-6
+              h2 Solve
+            .col-sm-6
+              button(onclick="window.k.solveItr()") Solve one cell
         #kakuro-container.col-md-6.col-sm-12
-    
+
     //- script(id='kakuro-template', type='text/ractive')
       //- include kakuro.jade
     script(src='https://code.jquery.com/jquery-2.2.1.js')
     //- script(src='http://cdn.ractivejs.org/latest/ractive.js')
     script(src='js/kakuro.js')
-  
+

@@ -748,7 +748,7 @@
       if (this.type() === 'TOTAL') {
         return '<td class="total">' + '<table>' + '<tr>' + '<td>' + this.topRightStr() + '</td>' + '</tr>' + '<tr>' + '<td>' + this.bottomLeftStr() + '</td>' + '</tr>' + '</table>' + '</td>';
       }
-      return '<td class="number">' + this.raw + '</td>';
+      return '<td class="number"><input type="text" value="' + this.raw + '"></td>';
     };
 
     Cell.prototype.topRight = function() {

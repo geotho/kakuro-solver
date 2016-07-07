@@ -1,6 +1,37 @@
 #kakuro-container {}
 
-#kakuro-container table, th, td {
+#kakuro-container table, #kakuro-container table th, #kakuro-container table td {
     border: 1px solid black;
     border-collapse: collapse;
+}
+
+#kakuro-container td table, #kakuro-container td th, #kakuro-container td td {
+  border: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#kakuro-container td table tr:first-child {
+  text-align: right;
+}
+
+#kakuro-container > table tbody tr {
+  height: 1.6em;
+}
+
+#kakuro-container td {
+  padding: 1px 3px;
+}
+
+#kakuro-container td.total {
+  background-color: #ccc;
+}
+
+#kakuro-container td.blank {
+  background-color: #888;
+}
+
+#kakuro-container td.number {
+  text-align: center;
+  vertical-align: middle;
 }

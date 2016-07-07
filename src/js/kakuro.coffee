@@ -238,11 +238,6 @@ class Kakuro
           @uninsert(out)
     return null
 
-  # backtracking: (start) ->
-    # goal is to exclude from domain by contradiction
-    # for
-
-
   backtrack: (cell, depth, initialDepth) ->
     if cell.domain.length == 0 || cell.raw != ""
       return true
@@ -281,27 +276,6 @@ class Kakuro
             if @backtrack(cell, i, i)
               return true
     return false
-  #   searchQueue = []
-  #   assignmentStack = []
-
-  #   # keep assigning until inconsistent, maintaining a log of stuff to assign.
-  #   # if reach contradiction,
-
-  #   # find inconsistent assignment
-  #   while cell.domain.length > 0
-  #     if cell.raw != ""
-  #       cell = searchQueue.pop()
-  #       continue
-
-  #     assignmentStack.push(@insert(cell.x, cell.y, cell.domain[0]))
-  #     searchQueue.push(x) for x in cell.constrains.sort (a, b) -> b.constrains.length - a.constrains.length
-  #     cell = searchQueue.pop()
-
-  #   while cell.domain.length == 0
-  #     out = assignmentStack.pop()
-  #     cell = @getCell(out.x, out.y)
-  #     @uninsert(out)
-  #     console.log("[backtracking] removing ", cell.domain.splice(cell.domain.indexOf(out.val), 1), "from domain of cell ", cell.string())
 
   findBacktrackingStart: (constrainsSize) ->
     for row in @cells
@@ -494,7 +468,7 @@ class Cell
           '<tr>' + '<td>' + @bottomLeftStr() + '</td>' + '</tr>' +
         '</table>' +
       '</td>'
-    return '<td class="number">' + @raw + '</td>'
+    return '<td class="number"><input type="text" value="' + @raw + '"></td>'
 
   topRight: ->
     s = parseInt @raw.split('-')[1]
